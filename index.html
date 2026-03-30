@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>My Retro Challenge Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">개인용 레트로 업적 기록</div>
+        <h1 id="topTitle">홈</h1>
+      </div>
+      <div class="top-actions">
+        <button class="btn ghost" id="backupTopBtn">백업</button>
+        <button class="btn primary" id="quickAddBtn">+ 게임 추가</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="page active" id="page-home">
+        <div class="panel hero-panel">
+          <div class="hero-top">
+            <div>
+              <div class="panel-title">전체 진행률</div>
+              <div class="hero-value" id="homeOverallPercent">0%</div>
+              <div class="muted small" id="homeOverallText">0 / 0 달성</div>
+            </div>
+            <div class="hero-side muted small" id="homeGameCount">게임 0개</div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="homeOverallBar"></div></div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>최근 달성</h2>
+          </div>
+          <div class="home-media-grid" id="homeRecentAchievements"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>최근 플레이한 게임</h2>
+          </div>
+          <div class="home-media-grid" id="homeRecentGames"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-games">
+        <div class="searchbar">
+          <span>🔎</span>
+          <input id="gameSearchInput" type="text" placeholder="게임 제목 검색" />
+        </div>
+
+        <div class="toolbar-row">
+          <button class="btn ghost" id="viewBtn">보기</button>
+          <button class="btn ghost" id="filterBtn">필터</button>
+          <button class="btn ghost" id="sortBtn">정렬</button>
+        </div>
+
+        <div class="chip-row" id="appliedChips"></div>
+        <div id="gamesContainer"></div>
+      </section>
+
+      <section class="page" id="page-detail">
+        <div class="panel">
+          <div class="detail-top">
+            <div class="detail-cover" id="detailCover">NO IMAGE</div>
+            <div class="detail-main">
+              <h2 id="detailTitle">게임명</h2>
+              <div class="muted small" id="detailSubtitle"></div>
+              <div class="meta-row" id="detailMeta"></div>
+
+              <div class="detail-progress">
+                <div class="space-between">
+                  <strong id="detailProgressText">0%</strong>
+                  <span class="muted small" id="detailProgressCount">0 / 0 달성</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" id="detailProgressBar"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-row mt14">
+            <button class="btn ghost" id="backToGamesBtn">목록으로</button>
+            <button class="btn ghost" id="editGameBtn">게임 수정</button>
+            <button class="btn ghost" id="deleteGameBtn">게임 삭제</button>
+            <button class="btn primary" id="addAchievementBtn">업적 추가</button>
+          </div>
+        </div>
+
+        <div class="seg-row" id="achievementFilterSeg"></div>
+        <div class="list-col" id="achievementList"></div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>게임 메모</h2></div>
+          <div class="note-box" id="detailNote">메모가 없습니다.</div>
+        </div>
+      </section>
+
+      <section class="page" id="page-records">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>달성 기록</h2>
+            <span class="muted small" id="recordsCount">0개</span>
+          </div>
+          <div class="list-col" id="recordsList"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="panel">
+          <div class="panel-head"><h2>저장과 백업</h2></div>
+          <div class="list-col">
+            <div class="item-box">
+              <strong>현재 저장 위치</strong>
+              <div class="muted small">브라우저 localStorage</div>
+            </div>
+            <div class="item-box">
+              <strong>마지막 자동 저장</strong>
+              <div class="muted small" id="lastSavedAt">-</div>
+            </div>
+            <div class="item-box">
+              <strong>마지막 백업</strong>
+              <div class="muted small" id="lastBackupAt">-</div>
+            </div>
+            <div class="item-box">
+              <strong>주의</strong>
+              <div class="muted small">브라우저 데이터를 지우면 기록이 사라질 수 있다. 중요한 기록은 JSON으로 백업해두는 게 안전하다.</div>
+            </div>
+            <div class="item-box">
+              <strong>이미지 저장</strong>
+              <div class="muted small">게임/업적에 파일 이미지를 많이 넣으면 저장 용량이 빨리 찰 수 있다. 큰 이미지는 줄여서 쓰는 편이 좋다.</div>
+            </div>
+          </div>
+          <div class="toolbar-row mt14">
+            <button class="btn ghost" id="exportBtn">JSON 내보내기</button>
+            <label class="btn ghost" for="importInput">JSON 불러오기</label>
+            <input id="importInput" type="file" accept="application/json" hidden />
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>기본 규칙</h2></div>
+          <div class="list-col">
+            <div class="item-box"><strong>대표 제목</strong><div class="muted small">한국어 표기 우선</div></div>
+            <div class="item-box"><strong>보조 제목</strong><div class="muted small">원제 또는 다른 표기</div></div>
+            <div class="item-box"><strong>발매일 정렬</strong><div class="muted small">일본 첫 발매일 기준</div></div>
+            <div class="item-box"><strong>기종별 보기</strong><div class="muted small">원작 기종 기준</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>위험 작업</h2></div>
+          <button class="btn danger" id="resetBtn">전체 데이터 초기화</button>
+        </div>
+      </section>
+    </main>
+
+    <button class="fab" id="fabBtn">＋</button>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-page="home">홈</button>
+      <button class="nav-btn" data-page="games">게임</button>
+      <button class="nav-btn" data-page="records">기록</button>
+      <button class="nav-btn" data-page="settings">설정</button>
+    </nav>
+  </div>
+
+  <div class="backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="optionDrawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-head">
+      <strong id="drawerTitle">옵션</strong>
+      <button class="btn ghost small-btn" id="drawerCloseBtn">닫기</button>
+    </div>
+    <div id="drawerContent"></div>
+  </aside>
+
+  <div class="backdrop" id="modalBackdrop"></div>
+  <section class="modal" id="formModal">
+    <div class="drawer-head modal-head">
+      <strong id="modalTitle">추가</strong>
+      <button class="btn ghost small-btn" id="modalCloseBtn">닫기</button>
+    </div>
+    <form id="modalForm"></form>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
