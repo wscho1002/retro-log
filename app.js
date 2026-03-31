@@ -1,7 +1,7 @@
-const STORAGE_KEY = 'retroChallengeLogV2Visual';
+const STORAGE_KEY = 'retroChallengeLogV1';
 const DIFFICULTIES = ['쉬움', '보통', '어려움', '극악'];
 const STATUSES = ['예정', '플레이 중', '클리어', '올클 완료', '보류'];
-const GENRES = ['액션', 'RPG', '어드벤처', '슈팅', '격투', '퍼즐', '시뮬레이션', '레이싱', '플랫포머', '공포', '기타'];
+const GENRES = ['액션', 'RPG', '어드벤처', '슈팅', '격투', '퍼즐', '시뮬레이션', '레이싱', '플랫포머', '기타'];
 const ORIGINAL_PLATFORMS = [
   'Famicom','Disk System','Super Famicom','Nintendo 64','GameCube','Wii','Wii U','Switch',
   'Game Boy','Game Boy Color','Game Boy Advance','Nintendo DS','Nintendo 3DS',
@@ -19,24 +19,22 @@ const ACH_FILTERS = [
   { key: 'hard', label: '어려움 이상' }
 ];
 
+let state = loadState();
 let currentPage = 'home';
 let selectedGameId = null;
+let currentDrawerType = null;
 let currentAchievementFilter = 'all';
-let state = normalizeState(loadState());
-selectedGameId = state.games[0]?.id || null;
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
 
 function seedData() {
+  const smbId = uid();
+  const bioId = uid();
   const now = new Date().toISOString();
   return {
     games: [
       {
-        id: uid(),
-        title: '슈퍼 마리오 브라더스',
-        altTitle: 'スーパーマリオブラザーズ',
+        id: smbId,
+        title: '스ーパーマリオブラザーズ',
+        altTitle: '슈퍼 마리오 브라더스',
         originalPlatform: 'Famicom',
         playedPlatform: 'Switch Online',
         releaseDate: '1985-09-13',
@@ -47,39 +45,39 @@ function seedData() {
         createdAt: now,
         updatedAt: now,
         achievements: [
-          { id: uid(), title: '1회 클리어', description: '엔딩 보기', difficulty: '쉬움', image: '', completed: true, completedAt: '2026-03-18', note: '초반 워프 사용', order: 1, updatedAt: now },
-          { id: uid(), title: '워프 없이 클리어', description: '전 구간 정석 진행', difficulty: '보통', image: '', completed: false, completedAt: '', note: '', order: 2, updatedAt: now },
-          { id: uid(), title: '노컨티뉴 클리어', description: '컨티뉴 없이 엔딩', difficulty: '어려움', image: '', completed: false, completedAt: '', note: '', order: 3, updatedAt: now }
+          { id: uid(), title: '1회 클리어', description: '엔딩 보기', difficulty: '쉬움', completed: true, completedAt: '2026-03-18', note: '초반 워프 사용', order: 1, updatedAt: now },
+          { id: uid(), title: '워프 없이 클리어', description: '전 구간 정석 진행', difficulty: '보통', completed: false, completedAt: '', note: '', order: 2, updatedAt: now },
+          { id: uid(), title: '노컨티뉴 클리어', description: '컨티뉴 없이 엔딩', difficulty: '어려움', completed: false, completedAt: '', note: '', order: 3, updatedAt: now }
         ]
       },
       {
-        id: uid(),
-        title: '바이오하자드',
-        altTitle: 'バイオハザード',
+        id: bioId,
+        title: 'バイオハザード',
+        altTitle: 'Resident Evil',
         originalPlatform: 'PlayStation',
         playedPlatform: 'GameCube 실기',
         releaseDate: '1996-03-22',
-        genre: '공포',
+        genre: '어드벤처',
         status: '예정',
         coverImage: '',
         note: '원작 감성 위주로 천천히 진행.',
         createdAt: now,
         updatedAt: now,
         achievements: [
-          { id: uid(), title: '1회 엔딩 보기', description: '아무 루트나 엔딩 보기', difficulty: '쉬움', image: '', completed: false, completedAt: '', note: '', order: 1, updatedAt: now },
-          { id: uid(), title: '세이브 최소화', description: '세이브를 아껴서 클리어', difficulty: '어려움', image: '', completed: false, completedAt: '', note: '', order: 2, updatedAt: now }
+          { id: uid(), title: '1회 엔딩 보기', description: '아무 루트나 엔딩 보기', difficulty: '쉬움', completed: false, completedAt: '', note: '', order: 1, updatedAt: now },
+          { id: uid(), title: '세이브 최소화', description: '세이브 사용을 최소화한 클리어', difficulty: '어려움', completed: false, completedAt: '', note: '', order: 2, updatedAt: now }
         ]
       }
     ],
     ui: {
       gamesViewMode: 'all',
-      filters: { status: '', originalPlatform: '', playedPlatform: '' },
+      filters: {
+        status: '',
+        originalPlatform: '',
+        playedPlatform: ''
+      },
       sort: 'releaseAsc',
       search: ''
-    },
-    meta: {
-      lastSavedAt: '',
-      lastBackupAt: ''
     }
   };
 }
@@ -88,68 +86,33 @@ function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return seedData();
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.games || !parsed.ui) return seedData();
+    return parsed;
   } catch {
     return seedData();
   }
 }
 
-function normalizeState(input) {
-  const base = seedData();
-  const out = {
-    games: Array.isArray(input.games) ? input.games : base.games,
-    ui: { ...base.ui, ...(input.ui || {}), filters: { ...base.ui.filters, ...((input.ui || {}).filters || {}) } },
-    meta: { ...base.meta, ...(input.meta || {}) }
-  };
-
-  out.games = out.games.map(game => ({
-    ...game,
-    title: game.title || '이름 없는 게임',
-    altTitle: game.altTitle || '',
-    originalPlatform: game.originalPlatform || '기타',
-    playedPlatform: game.playedPlatform || '기타',
-    releaseDate: game.releaseDate || '',
-    genre: game.genre || '기타',
-    status: game.status || '예정',
-    coverImage: game.coverImage || '',
-    note: game.note || '',
-    createdAt: game.createdAt || new Date().toISOString(),
-    updatedAt: game.updatedAt || new Date().toISOString(),
-    achievements: Array.isArray(game.achievements) ? game.achievements.map((ach, index) => ({
-      ...ach,
-      title: ach.title || '이름 없는 업적',
-      description: ach.description || '',
-      difficulty: ach.difficulty || '보통',
-      image: ach.image || '',
-      completed: !!ach.completed,
-      completedAt: ach.completedAt || '',
-      note: ach.note || '',
-      order: Number.isFinite(Number(ach.order)) ? Number(ach.order) : index + 1,
-      updatedAt: ach.updatedAt || new Date().toISOString()
-    })) : []
-  }));
-
-  out.games.forEach(normalizeAchievementOrder);
-  return out;
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function saveState() {
-  state.meta.lastSavedAt = new Date().toISOString();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error(error);
-    alert('저장에 실패했다. 이미지가 너무 크거나 많아서 브라우저 저장공간이 부족할 수 있다. JSON 백업 후 이미지 크기를 줄여보자.');
-  }
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
 }
 
 function escapeHtml(str = '') {
-  return String(str)
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function getStatusClass(status = '') {
+  return `status-${status.replace(/\s/g, '')}`;
 }
 
 function formatDate(dateString) {
@@ -159,13 +122,6 @@ function formatDate(dateString) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function formatDateTime(dateString) {
-  if (!dateString) return '-';
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return dateString;
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
 function yearOf(dateString = '') {
   return dateString ? String(dateString).slice(0, 4) : '-';
 }
@@ -173,139 +129,55 @@ function yearOf(dateString = '') {
 function gameProgress(game) {
   const total = game.achievements.length;
   const completed = game.achievements.filter(a => a.completed).length;
-  return { total, completed, percent: total ? Math.round((completed / total) * 100) : 0 };
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+  return { total, completed, percent };
 }
 
 function overallStats() {
   const totalGames = state.games.length;
-  const totalAchievements = state.games.reduce((sum, game) => sum + game.achievements.length, 0);
-  const completedAchievements = state.games.reduce((sum, game) => sum + game.achievements.filter(a => a.completed).length, 0);
+  const totalAchievements = state.games.reduce((sum, g) => sum + g.achievements.length, 0);
+  const completedAchievements = state.games.reduce((sum, g) => sum + g.achievements.filter(a => a.completed).length, 0);
+  const overallPercent = totalAchievements ? Math.round((completedAchievements / totalAchievements) * 100) : 0;
   const clearedGames = state.games.filter(g => ['클리어', '올클 완료'].includes(g.status)).length;
   const playingGames = state.games.filter(g => g.status === '플레이 중').length;
-  return {
-    totalGames,
-    totalAchievements,
-    completedAchievements,
-    overallPercent: totalAchievements ? Math.round((completedAchievements / totalAchievements) * 100) : 0,
-    clearedGames,
-    playingGames
-  };
+  return { totalGames, totalAchievements, completedAchievements, overallPercent, clearedGames, playingGames };
 }
 
 function recentAchievementRecords(limit = 20) {
-  return state.games.flatMap(game => game.achievements
-    .filter(ach => ach.completed)
-    .map(ach => ({
-      gameId: game.id,
-      gameTitle: game.title,
-      title: ach.title,
-      difficulty: ach.difficulty,
-      completedAt: ach.completedAt,
-      image: ach.image || '',
-      gameCover: game.coverImage || ''
-    })))
-    .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))
-    .slice(0, limit);
+  return state.games.flatMap(game =>
+    game.achievements
+      .filter(a => a.completed)
+      .map(a => ({
+        gameId: game.id,
+        gameTitle: game.title,
+        achievementId: a.id,
+        achievementTitle: a.title,
+        completedAt: a.completedAt,
+        difficulty: a.difficulty
+      }))
+  )
+  .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))
+  .slice(0, limit);
 }
 
 function recentlyUpdatedGames(limit = 10) {
-  return [...state.games].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, limit);
-}
-
-function statusClass(status = '') {
-  if (status === '플레이 중') return 'status-playing';
-  if (status === '클리어') return 'status-cleared';
-  if (status === '올클 완료') return 'status-master';
-  if (status === '보류') return 'status-hold';
-  return '';
-}
-
-function diffClass(difficulty = '') {
-  return `diff-${difficulty}`;
-}
-
-function coverTheme(platform = '기타') {
-  const map = {
-    Famicom: ['#ff6b6b', '#6b8cff'],
-    'Disk System': ['#ff6f61', '#ffbe5c'],
-    'Super Famicom': ['#8d7bff', '#61c7ff'],
-    'Nintendo 64': ['#ff8f5c', '#6be6a8'],
-    'Game Boy': ['#8ce6ff', '#7d88ff'],
-    'Game Boy Color': ['#66d1ff', '#c273ff'],
-    'Game Boy Advance': ['#73c4ff', '#6d7cff'],
-    PlayStation: ['#6b8cff', '#7fffe3'],
-    Wii: ['#9ee7ff', '#7f8cff'],
-    Switch: ['#ff5c7a', '#64d0ff'],
-    Arcade: ['#ff9a5c', '#ffd166'],
-    기타: ['#4b5b70', '#273140']
-  };
-  return map[platform] || map['기타'];
-}
-
-function achievementTheme(difficulty = '보통') {
-  const map = {
-    쉬움: ['#3abff8', '#0f5f9f'],
-    보통: ['#59d98e', '#0e6a59'],
-    어려움: ['#ffc857', '#b85f1d'],
-    극악: ['#ff6b6b', '#8f1c4e']
-  };
-  return map[difficulty] || map['보통'];
-}
-
-function coverMarkup(game, variant = 'small') {
-  if (game.coverImage) {
-    return `<img src="${escapeHtml(game.coverImage)}" alt="${escapeHtml(game.title)}">`;
-  }
-  const [a, b] = coverTheme(game.originalPlatform);
-  const cls = variant === 'detail' ? 'detail-cover-fallback' : 'cover-fallback';
-  return `
-    <div class="${cls}" style="--cover-a:${a}; --cover-b:${b};">
-      <div class="cover-platform">${escapeHtml(game.originalPlatform)}</div>
-      <div class="cover-title">${escapeHtml(game.title)}</div>
-      <div class="cover-year">${escapeHtml(yearOf(game.releaseDate))}</div>
-    </div>
-  `;
-}
-
-function achievementImageMarkup(achievement, gameTitle = '') {
-  if (achievement.image) {
-    return `<img src="${escapeHtml(achievement.image)}" alt="${escapeHtml(achievement.title)}">`;
-  }
-  const [a, b] = achievementTheme(achievement.difficulty);
-  const stateText = achievement.completed ? '달성 완료' : '미달성';
-  return `
-    <div class="achievement-fallback" style="--cover-a:${a}; --cover-b:${b};">
-      <div class="achievement-difficulty">${escapeHtml(achievement.difficulty)}</div>
-      <div class="achievement-fallback-title">${escapeHtml(achievement.title || gameTitle || '업적')}</div>
-      <div class="achievement-status-text">${stateText}</div>
-    </div>
-  `;
-}
-
-function coverPreviewMarkup(gameLike = {}) {
-  return coverMarkup({
-    title: gameLike.title || '커버 미리보기',
-    originalPlatform: gameLike.originalPlatform || '기타',
-    releaseDate: gameLike.releaseDate || '',
-    coverImage: gameLike.coverImage || ''
-  }, 'detail');
-}
-
-function achievementPreviewMarkup(achLike = {}) {
-  return achievementImageMarkup({
-    title: achLike.title || '업적 미리보기',
-    difficulty: achLike.difficulty || '보통',
-    image: achLike.image || '',
-    completed: false
-  }, '업적');
+  return [...state.games]
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    .slice(0, limit);
 }
 
 function applyGameFilters(games) {
   const { search, filters, sort } = state.ui;
   let out = [...games];
   const q = search.trim().toLowerCase();
+
   if (q) {
-    out = out.filter(game => [game.title, game.altTitle, game.originalPlatform, game.playedPlatform].join(' ').toLowerCase().includes(q));
+    out = out.filter(g =>
+      [g.title, g.altTitle, g.originalPlatform, g.playedPlatform]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    );
   }
   if (filters.status) out = out.filter(g => g.status === filters.status);
   if (filters.originalPlatform) out = out.filter(g => g.originalPlatform === filters.originalPlatform);
@@ -315,13 +187,14 @@ function applyGameFilters(games) {
     switch (sort) {
       case 'releaseAsc': return (a.releaseDate || '').localeCompare(b.releaseDate || '');
       case 'releaseDesc': return (b.releaseDate || '').localeCompare(a.releaseDate || '');
-      case 'titleAsc': return a.title.localeCompare(b.title, 'ko');
+      case 'titleAsc': return a.title.localeCompare(b.title, 'ja');
       case 'recentAdded': return (b.createdAt || '').localeCompare(a.createdAt || '');
       case 'progressHigh': return gameProgress(b).percent - gameProgress(a).percent;
       case 'progressLow': return gameProgress(a).percent - gameProgress(b).percent;
       default: return 0;
     }
   });
+
   return out;
 }
 
@@ -329,32 +202,34 @@ function render() {
   renderTopbar();
   renderHome();
   renderGames();
-  renderDetail();
   renderRecords();
   renderSettings();
+  renderDetail();
   syncNav();
   saveState();
 }
 
 function renderTopbar() {
-  const titleMap = { home: '홈', games: '게임', detail: '게임 상세', records: '기록', settings: '설정' };
+  const titleMap = {
+    home: '홈',
+    games: '게임',
+    detail: '게임 상세',
+    records: '기록',
+    settings: '설정'
+  };
   document.getElementById('topTitle').textContent = titleMap[currentPage] || '홈';
-  const fab = document.getElementById('fabBtn');
-  if (currentPage === 'detail') {
-    fab.textContent = '★';
-    fab.style.display = 'grid';
-  } else if (currentPage === 'games') {
-    fab.textContent = '＋';
-    fab.style.display = 'grid';
-  } else {
-    fab.style.display = 'none';
-  }
+  document.getElementById('fabBtn').classList.toggle('hidden', !(currentPage === 'games' || currentPage === 'detail'));
+  document.getElementById('fabBtn').textContent = currentPage === 'detail' ? '★' : '＋';
 }
 
 function setPage(page) {
   currentPage = page;
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-  document.getElementById(`page-${page === 'detail' ? 'detail' : page}`).classList.add('active');
+  if (page === 'detail') {
+    document.getElementById('page-detail').classList.add('active');
+  } else {
+    document.getElementById(`page-${page}`).classList.add('active');
+  }
   renderTopbar();
   syncNav();
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -369,101 +244,82 @@ function syncNav() {
 
 function renderHome() {
   const stats = overallStats();
-  document.getElementById('homeOverallPercent').textContent = `${stats.overallPercent}%`;
   document.getElementById('homeOverallText').textContent = `${stats.completedAchievements} / ${stats.totalAchievements} 달성`;
+  document.getElementById('homeOverallPercent').textContent = `${stats.overallPercent}%`;
   document.getElementById('homeGameCount').textContent = `게임 ${stats.totalGames}개`;
   document.getElementById('homeOverallBar').style.width = `${stats.overallPercent}%`;
+
   document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-box"><div class="stat-label">등록 게임</div><div class="stat-value">${stats.totalGames}</div></div>
-    <div class="stat-box"><div class="stat-label">전체 업적</div><div class="stat-value">${stats.totalAchievements}</div></div>
-    <div class="stat-box"><div class="stat-label">클리어 이상</div><div class="stat-value">${stats.clearedGames}</div></div>
-    <div class="stat-box"><div class="stat-label">플레이 중</div><div class="stat-value">${stats.playingGames}</div></div>
+    <div class="stat"><div class="label">등록 게임</div><div class="value">${stats.totalGames}</div></div>
+    <div class="stat"><div class="label">전체 업적</div><div class="value">${stats.totalAchievements}</div></div>
+    <div class="stat"><div class="label">클리어 이상</div><div class="value">${stats.clearedGames}</div></div>
+    <div class="stat"><div class="label">플레이 중</div><div class="value">${stats.playingGames}</div></div>
   `;
 
-  const recentAchievements = recentAchievementRecords(4);
-  document.getElementById('homeRecentAchievements').innerHTML = recentAchievements.length
-    ? recentAchievements.map(record => `
-      <button class="media-card" onclick="openGame('${record.gameId}')">
-        <div class="media-thumb achievement">${record.image ? `<img src="${escapeHtml(record.image)}" alt="${escapeHtml(record.title)}">` : (record.gameCover ? `<img src="${escapeHtml(record.gameCover)}" alt="${escapeHtml(record.gameTitle)}">` : achievementImageMarkup({ title: record.title, difficulty: record.difficulty, image: '', completed: true }, record.gameTitle))}</div>
-        <div class="media-card-body">
-          <h3 class="media-title">${escapeHtml(record.title)}</h3>
-          <div class="media-subtitle">${escapeHtml(record.gameTitle)}</div>
-          <div class="media-footer">
-            <span class="badge ${diffClass(record.difficulty)}">${escapeHtml(record.difficulty)}</span>
-            <span class="muted small">${formatDate(record.completedAt)}</span>
-          </div>
-        </div>
-      </button>
-    `).join('')
-    : `<div class="empty">아직 달성한 업적이 없다.</div>`;
-
-  const recentGames = recentlyUpdatedGames(4);
-  document.getElementById('homeRecentGames').innerHTML = recentGames.length
-    ? recentGames.map(game => {
-      const prog = gameProgress(game);
-      return `
-        <button class="media-card" onclick="openGame('${game.id}')">
-          <div class="media-thumb">${coverMarkup(game, 'detail')}</div>
-          <div class="media-card-body">
-            <h3 class="media-title">${escapeHtml(game.title)}</h3>
-            <div class="media-subtitle">${escapeHtml(game.originalPlatform)} · ${yearOf(game.releaseDate)}</div>
-            <div class="media-footer">
-              <span class="badge ${statusClass(game.status)}">${escapeHtml(game.status)}</span>
-              <span class="muted small">${prog.percent}%</span>
-            </div>
-          </div>
-        </button>
-      `;
-    }).join('')
-    : `<div class="empty">등록된 게임이 없다.</div>`;
-}
-
-function renderGameCard(game) {
-  const prog = gameProgress(game);
-  return `
-    <button class="game-card" onclick="openGame('${game.id}')">
-      <div class="cover">${coverMarkup(game, 'small')}</div>
-      <div class="game-main">
+  const recent = recentAchievementRecords(5);
+  const recentWrap = document.getElementById('homeRecentAchievements');
+  recentWrap.innerHTML = recent.length ? recent.map(r => `
+    <button class="record-item" onclick="openGame('${r.gameId}')">
+      <div class="split">
         <div>
-          <h3 class="game-title">${escapeHtml(game.title)}</h3>
-          ${game.altTitle ? `<div class="subtitle">${escapeHtml(game.altTitle)}</div>` : ''}
+          <strong>${escapeHtml(r.achievementTitle)}</strong>
+          <div class="small muted" style="margin-top:4px;">${escapeHtml(r.gameTitle)}</div>
         </div>
-        <div class="meta-row">
-          <span class="badge">원작 ${escapeHtml(game.originalPlatform)}</span>
-          <span class="badge">플레이 ${escapeHtml(game.playedPlatform)}</span>
-          <span class="badge ${statusClass(game.status)}">${escapeHtml(game.status)}</span>
-          <span class="badge">${yearOf(game.releaseDate)}</span>
-        </div>
-        <div>
-          <div class="space-between"><span class="muted small">${prog.completed} / ${prog.total} 달성</span><strong class="small">${prog.percent}%</strong></div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${prog.percent}%"></div></div>
+        <div class="text-right">
+          <div class="badge">${escapeHtml(r.difficulty)}</div>
+          <div class="tiny muted" style="margin-top:6px;">${formatDate(r.completedAt)}</div>
         </div>
       </div>
     </button>
-  `;
+  `).join('') : `<div class="list-empty">아직 달성한 업적이 없다.</div>`;
+
+  const recentGames = recentlyUpdatedGames(4);
+  const rgWrap = document.getElementById('homeRecentGames');
+  rgWrap.innerHTML = recentGames.length ? recentGames.map(g => {
+    const prog = gameProgress(g);
+    return `
+      <button class="simple-item" onclick="openGame('${g.id}')">
+        <div class="split">
+          <div>
+            <strong>${escapeHtml(g.title)}</strong>
+            <div class="small muted" style="margin-top:4px;">${escapeHtml(g.originalPlatform)} · ${yearOf(g.releaseDate)}</div>
+          </div>
+          <div class="text-right">
+            <div class="badge ${getStatusClass(g.status)}">${escapeHtml(g.status)}</div>
+            <div class="tiny muted" style="margin-top:6px;">${prog.percent}%</div>
+          </div>
+        </div>
+      </button>
+    `;
+  }).join('') : `<div class="list-empty">등록된 게임이 없다.</div>`;
 }
 
 function renderGames() {
-  document.getElementById('gameSearchInput').value = state.ui.search;
+  document.getElementById('gameSearchInput').value = state.ui.search || '';
   renderAppliedChips();
   const games = applyGameFilters(state.games);
   const container = document.getElementById('gamesContainer');
+
   if (!games.length) {
-    container.innerHTML = `<div class="empty">조건에 맞는 게임이 없다.</div>`;
+    container.innerHTML = `<div class="list-empty">조건에 맞는 게임이 없다.</div>`;
     return;
   }
+
   if (state.ui.gamesViewMode === 'grouped') {
     const grouped = games.reduce((acc, game) => {
       (acc[game.originalPlatform] ||= []).push(game);
       return acc;
     }, {});
+
     container.innerHTML = Object.entries(grouped).map(([platform, list]) => `
       <details class="platform-group" open>
         <summary>
-          <strong>${escapeHtml(platform)}</strong>
-          <span class="muted small">${list.length}개</span>
+          <span>${escapeHtml(platform)}</span>
+          <span class="small muted">${list.length}개</span>
         </summary>
-        <div class="platform-body">${list.map(renderGameCard).join('')}</div>
+        <div class="group-body">
+          ${list.map(renderGameCard).join('')}
+        </div>
       </details>
     `).join('');
   } else {
@@ -471,11 +327,45 @@ function renderGames() {
   }
 }
 
+function renderGameCard(game) {
+  const prog = gameProgress(game);
+  const coverContent = game.coverImage
+    ? `<img src="${escapeHtml(game.coverImage)}" alt="${escapeHtml(game.title)}" />`
+    : `<span>${escapeHtml(game.title)}</span>`;
+
+  return `
+    <button class="game-card" onclick="openGame('${game.id}')">
+      <div class="cover">${coverContent}</div>
+      <div class="game-main">
+        <div>
+          <h3 class="game-title">${escapeHtml(game.title)}</h3>
+          ${game.altTitle ? `<div class="subtitle">${escapeHtml(game.altTitle)}</div>` : ''}
+        </div>
+        <div class="meta">
+          <span class="badge">원작 ${escapeHtml(game.originalPlatform)}</span>
+          <span class="badge">플레이 ${escapeHtml(game.playedPlatform)}</span>
+          <span class="badge ${getStatusClass(game.status)}">${escapeHtml(game.status)}</span>
+          <span class="badge">${yearOf(game.releaseDate)}</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-row">
+            <span class="small muted">${prog.completed} / ${prog.total} 달성</span>
+            <strong class="small">${prog.percent}%</strong>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${prog.percent}%"></div></div>
+        </div>
+      </div>
+    </button>
+  `;
+}
+
 function renderAppliedChips() {
-  const chips = [state.ui.gamesViewMode === 'grouped' ? '기종별 보기' : '전체보기'];
+  const chips = [];
+  chips.push(state.ui.gamesViewMode === 'grouped' ? '기종별 보기' : '전체보기');
   if (state.ui.filters.status) chips.push(`상태: ${state.ui.filters.status}`);
   if (state.ui.filters.originalPlatform) chips.push(`원작: ${state.ui.filters.originalPlatform}`);
   if (state.ui.filters.playedPlatform) chips.push(`플레이: ${state.ui.filters.playedPlatform}`);
+
   const sortMap = {
     releaseAsc: '발매일 빠른순',
     releaseDesc: '발매일 늦은순',
@@ -484,78 +374,74 @@ function renderAppliedChips() {
     progressHigh: '진행률 높은순',
     progressLow: '진행률 낮은순'
   };
+
   chips.push(sortMap[state.ui.sort]);
-  document.getElementById('appliedChips').innerHTML = chips.map(chip => `<span class="chip active">${escapeHtml(chip)}</span>`).join('');
+  document.getElementById('appliedChips').innerHTML = chips.map(c => `<span class="chip active">${escapeHtml(c)}</span>`).join('');
 }
 
 function renderDetail() {
   const game = state.games.find(g => g.id === selectedGameId);
-  if (!game) {
-    document.getElementById('detailTitle').textContent = '게임을 선택해줘';
-    document.getElementById('achievementList').innerHTML = `<div class="empty">게임이 없다.</div>`;
-    return;
-  }
+  if (!game) return;
+
   const prog = gameProgress(game);
-  document.getElementById('detailCover').innerHTML = coverMarkup(game, 'detail');
+  const cover = document.getElementById('detailCover');
+  cover.innerHTML = game.coverImage
+    ? `<img src="${escapeHtml(game.coverImage)}" alt="${escapeHtml(game.title)}" />`
+    : `<span>${escapeHtml(game.title)}</span>`;
+
   document.getElementById('detailTitle').textContent = game.title;
   document.getElementById('detailSubtitle').textContent = game.altTitle || '';
   document.getElementById('detailMeta').innerHTML = `
     <span class="badge">원작 ${escapeHtml(game.originalPlatform)}</span>
     <span class="badge">플레이 ${escapeHtml(game.playedPlatform)}</span>
-    <span class="badge">${escapeHtml(game.genre)}</span>
-    <span class="badge ${statusClass(game.status)}">${escapeHtml(game.status)}</span>
+    <span class="badge">${escapeHtml(game.genre || '기타')}</span>
+    <span class="badge ${getStatusClass(game.status)}">${escapeHtml(game.status)}</span>
     <span class="badge">${formatDate(game.releaseDate)}</span>
   `;
   document.getElementById('detailProgressText').textContent = `${prog.percent}%`;
   document.getElementById('detailProgressCount').textContent = `${prog.completed} / ${prog.total} 달성`;
   document.getElementById('detailProgressBar').style.width = `${prog.percent}%`;
   document.getElementById('detailNote').textContent = game.note?.trim() ? game.note : '메모가 없습니다.';
-  document.getElementById('achievementFilterSeg').innerHTML = ACH_FILTERS.map(filter => `
-    <button class="seg-btn ${currentAchievementFilter === filter.key ? 'active' : ''}" onclick="setAchievementFilter('${filter.key}')">${filter.label}</button>
+
+  document.getElementById('achievementFilterSeg').innerHTML = ACH_FILTERS.map(f => `
+    <button class="seg-btn ${currentAchievementFilter === f.key ? 'active' : ''}" onclick="setAchievementFilter('${f.key}')">${f.label}</button>
   `).join('');
 
+  const achWrap = document.getElementById('achievementList');
   let achievements = [...game.achievements].sort((a, b) => a.order - b.order);
   if (currentAchievementFilter === 'pending') achievements = achievements.filter(a => !a.completed);
   if (currentAchievementFilter === 'done') achievements = achievements.filter(a => a.completed);
   if (currentAchievementFilter === 'hard') achievements = achievements.filter(a => ['어려움', '극악'].includes(a.difficulty));
 
-  document.getElementById('achievementList').innerHTML = achievements.length
-    ? achievements.map(achievement => renderAchievementCard(game.id, game.title, achievement)).join('')
-    : `<div class="empty">조건에 맞는 업적이 없다.</div>`;
+  achWrap.innerHTML = achievements.length
+    ? achievements.map(a => renderAchievementItem(game, a)).join('')
+    : `<div class="list-empty">조건에 맞는 업적이 없다.</div>`;
 }
 
-function renderAchievementCard(gameId, gameTitle, achievement) {
+function renderAchievementItem(game, ach) {
   return `
-    <div class="achievement-card ${achievement.completed ? 'is-complete' : ''}" id="ach-${achievement.id}">
-      <div class="achievement-main">
-        <button class="check-btn ${achievement.completed ? 'done' : ''}" onclick="toggleAchievement('${gameId}','${achievement.id}'); event.stopPropagation();">✓</button>
-        <div class="achievement-art">${achievementImageMarkup(achievement, gameTitle)}</div>
-        <button class="achievement-text-button" onclick="toggleAchievementOpen('${achievement.id}')">
-          <h4 class="achievement-title">${escapeHtml(achievement.title)}</h4>
-          <div class="muted small" style="margin-top:4px;">${achievement.completed ? `${formatDate(achievement.completedAt)} 달성` : '탭해서 세부 정보 보기'}</div>
+    <div class="ach-item" id="ach-${ach.id}">
+      <div class="ach-main">
+        <button class="check-btn ${ach.completed ? 'done' : ''}" onclick="toggleAchievement('${game.id}','${ach.id}'); event.stopPropagation();">✓</button>
+        <button class="ach-text" style="background:none;border:0;color:inherit;text-align:left;padding:0;" onclick="toggleAchievementOpen('${ach.id}')">
+          <h4 class="ach-name">${escapeHtml(ach.title)}</h4>
+          ${ach.description ? `<div class="tiny muted" style="margin-top:4px; line-height:1.4;">${escapeHtml(ach.description)}</div>` : ''}
+          ${ach.completed ? `<div class="tiny muted" style="margin-top:4px;">${formatDate(ach.completedAt)} 달성</div>` : ''}
         </button>
-        <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
+        <span class="badge">${escapeHtml(ach.difficulty)}</span>
       </div>
-      <div class="achievement-extra">
-        <div>${achievement.description ? escapeHtml(achievement.description) : '<span class="muted">설명이 없다.</span>'}</div>
-        <div class="achievement-meta-grid">
-          <div class="achievement-art-preview">${achievementImageMarkup(achievement, gameTitle)}</div>
-          <div class="list-col" style="gap:10px;">
-            <div class="meta-row">
-              ${achievement.completed ? `<span class="badge">달성 ${formatDate(achievement.completedAt)}</span>` : `<span class="badge">미달성</span>`}
-              <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
-            </div>
-            <div class="field">
-              <label>메모</label>
-              <textarea class="textarea" onchange="saveAchievementNote('${gameId}','${achievement.id}', this.value)">${escapeHtml(achievement.note || '')}</textarea>
-            </div>
-          </div>
+      <div class="ach-extra">
+        <div class="small" style="line-height:1.5; margin-bottom:10px;">${ach.description ? escapeHtml(ach.description) : '<span class="muted">설명이 없다.</span>'}</div>
+        <div class="meta">
+          ${ach.completed ? `<span class="badge">달성 ${formatDate(ach.completedAt)}</span>` : `<span class="badge">미달성</span>`}
+        </div>
+        <div class="field">
+          <label>메모</label>
+          <textarea class="textarea" placeholder="업적 관련 메모" onchange="saveAchievementNote('${game.id}','${ach.id}', this.value)">${escapeHtml(ach.note || '')}</textarea>
         </div>
         <div class="inline-actions">
-          <button class="btn ghost" onclick="editAchievement('${gameId}','${achievement.id}')">업적 수정</button>
-          <button class="btn ghost" onclick="moveAchievement('${gameId}','${achievement.id}', -1)">위로</button>
-          <button class="btn ghost" onclick="moveAchievement('${gameId}','${achievement.id}', 1)">아래로</button>
-          <button class="btn danger" onclick="deleteAchievement('${gameId}','${achievement.id}')">업적 삭제</button>
+          <button class="tiny-btn" onclick="editAchievement('${game.id}','${ach.id}')">업적 수정</button>
+          <button class="tiny-btn danger" onclick="deleteAchievement('${game.id}','${ach.id}')">업적 삭제</button>
         </div>
       </div>
     </div>
@@ -565,72 +451,74 @@ function renderAchievementCard(gameId, gameTitle, achievement) {
 function renderRecords() {
   const records = recentAchievementRecords(200);
   document.getElementById('recordsCount').textContent = `${records.length}개`;
-  document.getElementById('recordsList').innerHTML = records.length ? records.map(record => `
-    <button class="item-card" onclick="openGame('${record.gameId}')">
-      <div class="achievement-main" style="grid-template-columns: 78px 1fr auto;">
-        <div class="achievement-art" style="width:78px; height:78px;">${record.image ? `<img src="${escapeHtml(record.image)}" alt="${escapeHtml(record.title)}">` : achievementImageMarkup({ title: record.title, difficulty: record.difficulty, image: '', completed: true }, record.gameTitle)}</div>
+  document.getElementById('recordsList').innerHTML = records.length ? records.map(r => `
+    <button class="record-item" onclick="openGame('${r.gameId}')">
+      <div class="split">
         <div>
-          <strong>${escapeHtml(record.title)}</strong>
-          <div class="muted small" style="margin-top:4px;">${escapeHtml(record.gameTitle)}</div>
+          <strong>${escapeHtml(r.achievementTitle)}</strong>
+          <div class="small muted" style="margin-top:4px;">${escapeHtml(r.gameTitle)}</div>
         </div>
-        <div style="text-align:right;">
-          <div class="badge ${diffClass(record.difficulty)}">${escapeHtml(record.difficulty)}</div>
-          <div class="muted small" style="margin-top:6px;">${formatDate(record.completedAt)}</div>
+        <div class="text-right">
+          <div class="badge">${escapeHtml(r.difficulty)}</div>
+          <div class="tiny muted" style="margin-top:6px;">${formatDate(r.completedAt)}</div>
         </div>
       </div>
     </button>
-  `).join('') : `<div class="empty">아직 달성 기록이 없다.</div>`;
+  `).join('') : `<div class="list-empty">아직 달성 기록이 없다.</div>`;
 }
 
 function renderSettings() {
-  document.getElementById('lastSavedAt').textContent = formatDateTime(state.meta.lastSavedAt);
-  document.getElementById('lastBackupAt').textContent = state.meta.lastBackupAt ? formatDateTime(state.meta.lastBackupAt) : '아직 백업 없음';
+  // static for now
 }
 
 function openDrawer(type) {
+  currentDrawerType = type;
   const title = document.getElementById('drawerTitle');
   const content = document.getElementById('drawerContent');
+
   if (type === 'view') {
     title.textContent = '보기';
     content.innerHTML = `
-      <div class="form-grid">
-        <button class="btn ${state.ui.gamesViewMode === 'all' ? 'primary' : 'ghost'}" onclick="setGamesViewMode('all')">전체보기</button>
-        <button class="btn ${state.ui.gamesViewMode === 'grouped' ? 'primary' : 'ghost'}" onclick="setGamesViewMode('grouped')">기종별 보기</button>
+      <div class="field-grid">
+        <button class="action ${state.ui.gamesViewMode === 'all' ? 'primary' : ''}" onclick="setGamesViewMode('all')">전체보기</button>
+        <button class="action ${state.ui.gamesViewMode === 'grouped' ? 'primary' : ''}" onclick="setGamesViewMode('grouped')">기종별 보기</button>
       </div>
     `;
   }
+
   if (type === 'filter') {
     title.textContent = '필터';
     content.innerHTML = `
-      <div class="form-grid">
+      <div class="field-grid">
         <div class="field">
           <label>상태</label>
           <select class="select" id="filterStatus">
             <option value="">전체</option>
-            ${STATUSES.map(value => `<option value="${value}" ${state.ui.filters.status === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${STATUSES.map(v => `<option value="${v}" ${state.ui.filters.status === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <label>원작 기종</label>
           <select class="select" id="filterOriginal">
             <option value="">전체</option>
-            ${ORIGINAL_PLATFORMS.map(value => `<option value="${value}" ${state.ui.filters.originalPlatform === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${ORIGINAL_PLATFORMS.map(v => `<option value="${v}" ${state.ui.filters.originalPlatform === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <label>플레이 기종</label>
           <select class="select" id="filterPlayed">
             <option value="">전체</option>
-            ${PLAYED_PLATFORMS.map(value => `<option value="${value}" ${state.ui.filters.playedPlatform === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${PLAYED_PLATFORMS.map(v => `<option value="${v}" ${state.ui.filters.playedPlatform === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
-        <div class="form-actions">
-          <button type="button" class="btn ghost" onclick="resetFilters()">초기화</button>
-          <button type="button" class="btn primary" onclick="applyFiltersFromDrawer()">적용</button>
+        <div class="dual">
+          <button class="action" onclick="resetFilters()">초기화</button>
+          <button class="action primary" onclick="applyFiltersFromDrawer()">적용</button>
         </div>
       </div>
     `;
   }
+
   if (type === 'sort') {
     title.textContent = '정렬';
     const options = [
@@ -641,8 +529,13 @@ function openDrawer(type) {
       ['progressHigh', '진행률 높은순'],
       ['progressLow', '진행률 낮은순']
     ];
-    content.innerHTML = `<div class="form-grid">${options.map(([value, label]) => `<button class="btn ${state.ui.sort === value ? 'primary' : 'ghost'}" onclick="setSort('${value}')">${label}</button>`).join('')}</div>`;
+    content.innerHTML = `
+      <div class="field-grid">
+        ${options.map(([value, label]) => `<button class="action ${state.ui.sort === value ? 'primary' : ''}" onclick="setSort('${value}')">${label}</button>`).join('')}
+      </div>
+    `;
   }
+
   document.getElementById('drawerBackdrop').classList.add('open');
   document.getElementById('optionDrawer').classList.add('open');
 }
@@ -650,16 +543,16 @@ function openDrawer(type) {
 function closeDrawer() {
   document.getElementById('drawerBackdrop').classList.remove('open');
   document.getElementById('optionDrawer').classList.remove('open');
+  currentDrawerType = null;
 }
 
 function openModal(config) {
   document.getElementById('modalTitle').textContent = config.title;
-  const form = document.getElementById('modalForm');
-  form.innerHTML = config.html;
-  form.onsubmit = config.onSubmit;
+  document.getElementById('modalForm').innerHTML = config.html;
+  document.getElementById('modalForm').onsubmit = config.onSubmit;
   document.getElementById('modalBackdrop').classList.add('open');
   document.getElementById('formModal').classList.add('open');
-  if (typeof config.onOpen === 'function') config.onOpen(form);
+  setTimeout(() => document.querySelector('#modalForm input, #modalForm select, #modalForm textarea')?.focus(), 0);
 }
 
 function closeModal() {
@@ -671,30 +564,30 @@ function closeModal() {
 
 function gameFormHtml(game = {}) {
   return `
-    <div class="form-grid">
+    <div class="field-grid">
       <div class="field">
-        <label>대표 제목 (한국어 표기)</label>
-        <input class="input" name="title" required value="${escapeHtml(game.title || '')}" placeholder="예: 바이오하자드" />
+        <label>대표 제목 (일본판 기준)</label>
+        <input class="input" name="title" required value="${escapeHtml(game.title || '')}" placeholder="예: バイオハザード" />
       </div>
       <div class="field">
-        <label>원제 / 보조 제목</label>
-        <input class="input" name="altTitle" value="${escapeHtml(game.altTitle || '')}" placeholder="예: バイオハザード" />
+        <label>보조 제목</label>
+        <input class="input" name="altTitle" value="${escapeHtml(game.altTitle || '')}" placeholder="예: Resident Evil" />
       </div>
-      <div class="form-two">
+      <div class="dual">
         <div class="field">
           <label>원작 기종</label>
           <select class="select" name="originalPlatform" required>
-            ${ORIGINAL_PLATFORMS.map(value => `<option value="${value}" ${(game.originalPlatform || ORIGINAL_PLATFORMS[0]) === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${ORIGINAL_PLATFORMS.map(v => `<option value="${v}" ${(game.originalPlatform || '') === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <label>플레이 기종</label>
           <select class="select" name="playedPlatform" required>
-            ${PLAYED_PLATFORMS.map(value => `<option value="${value}" ${(game.playedPlatform || PLAYED_PLATFORMS[0]) === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${PLAYED_PLATFORMS.map(v => `<option value="${v}" ${(game.playedPlatform || '') === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
       </div>
-      <div class="form-two">
+      <div class="dual">
         <div class="field">
           <label>일본 첫 발매일</label>
           <input class="input" type="date" name="releaseDate" value="${escapeHtml(game.releaseDate || '')}" />
@@ -702,251 +595,125 @@ function gameFormHtml(game = {}) {
         <div class="field">
           <label>상태</label>
           <select class="select" name="status">
-            ${STATUSES.map(value => `<option value="${value}" ${(game.status || '예정') === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${STATUSES.map(v => `<option value="${v}" ${(game.status || '예정') === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="field">
         <label>장르</label>
         <select class="select" name="genre">
-          ${GENRES.map(value => `<option value="${value}" ${(game.genre || '액션') === value ? 'selected' : ''}>${value}</option>`).join('')}
+          ${GENRES.map(v => `<option value="${v}" ${(game.genre || '액션') === v ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
       </div>
-      <div class="preview-grid">
-        <div class="field">
-          <label>커버 이미지 URL</label>
-          <input class="input" name="coverImageUrl" value="${escapeHtml(game.coverImage || '')}" placeholder="https://... 또는 비워두기" />
-          <div class="field-help">파일을 고르면 파일 이미지가 URL보다 우선된다.</div>
-        </div>
-        <div class="field">
-          <label>커버 이미지 파일 업로드</label>
-          <input class="input" type="file" name="coverImageFile" accept="image/*" />
-          <label class="field-help"><input type="checkbox" name="removeCoverImage"> 커버 이미지를 제거하고 기본 카드 사용</label>
-        </div>
-      </div>
       <div class="field">
-        <label>커버 미리보기</label>
-        <div class="cover-preview" id="coverPreviewArea">${coverPreviewMarkup(game)}</div>
+        <label>커버 이미지 URL</label>
+        <input class="input" name="coverImage" value="${escapeHtml(game.coverImage || '')}" placeholder="https://..." />
       </div>
       <div class="field">
         <label>메모</label>
-        <textarea class="textarea" name="note">${escapeHtml(game.note || '')}</textarea>
+        <textarea class="textarea" name="note" placeholder="플레이 목표나 비고">${escapeHtml(game.note || '')}</textarea>
       </div>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn ghost" onclick="closeModal()">취소</button>
-      <button type="submit" class="btn primary">저장</button>
+      <button type="button" class="action" onclick="closeModal()">취소</button>
+      <button type="submit" class="action primary">저장</button>
     </div>
   `;
 }
 
-function achievementFormHtml(game, achievement = {}) {
+function achievementFormHtml(gameId, ach = {}) {
+  const game = state.games.find(g => g.id === gameId);
   return `
-    <div class="form-grid">
-      <div class="item-box"><strong>${escapeHtml(game.title)}</strong></div>
+    <div class="field-grid">
+      <div class="notice">${escapeHtml(game?.title || '')}</div>
       <div class="field">
         <label>업적 이름</label>
-        <input class="input" name="title" required value="${escapeHtml(achievement.title || '')}" placeholder="예: 노컨티뉴 클리어" />
+        <input class="input" name="title" required value="${escapeHtml(ach.title || '')}" placeholder="예: 노컨티뉴 클리어" />
       </div>
       <div class="field">
         <label>설명</label>
-        <textarea class="textarea" name="description">${escapeHtml(achievement.description || '')}</textarea>
+        <textarea class="textarea" name="description" placeholder="조건 설명">${escapeHtml(ach.description || '')}</textarea>
       </div>
-      <div class="form-two">
+      <div class="dual">
         <div class="field">
           <label>난이도</label>
           <select class="select" name="difficulty">
-            ${DIFFICULTIES.map(value => `<option value="${value}" ${(achievement.difficulty || '보통') === value ? 'selected' : ''}>${value}</option>`).join('')}
+            ${DIFFICULTIES.map(v => `<option value="${v}" ${(ach.difficulty || '보통') === v ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <label>정렬 순서</label>
-          <input class="input" type="number" name="order" min="1" value="${achievement.order || (game.achievements.length + 1)}" />
+          <input class="input" type="number" name="order" min="1" value="${ach.order || ((game?.achievements.length || 0) + 1)}" />
         </div>
-      </div>
-      <div class="preview-grid">
-        <div class="field">
-          <label>업적 이미지 URL</label>
-          <input class="input" name="achievementImageUrl" value="${escapeHtml(achievement.image || '')}" placeholder="https://... 또는 비워두기" />
-          <div class="field-help">스팀 도전과제처럼 업적마다 이미지를 따로 쓸 수 있다.</div>
-        </div>
-        <div class="field">
-          <label>업적 이미지 파일 업로드</label>
-          <input class="input" type="file" name="achievementImageFile" accept="image/*" />
-          <label class="field-help"><input type="checkbox" name="removeAchievementImage"> 업적 이미지를 제거하고 기본 카드 사용</label>
-        </div>
-      </div>
-      <div class="field">
-        <label>업적 이미지 미리보기</label>
-        <div class="achievement-art-preview" id="achievementPreviewArea">${achievementPreviewMarkup(achievement)}</div>
       </div>
       <div class="field">
         <label>메모</label>
-        <textarea class="textarea" name="note">${escapeHtml(achievement.note || '')}</textarea>
+        <textarea class="textarea" name="note" placeholder="추가 메모">${escapeHtml(ach.note || '')}</textarea>
       </div>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn ghost" onclick="closeModal()">취소</button>
-      <button type="submit" class="btn primary">저장</button>
+      <button type="button" class="action" onclick="closeModal()">취소</button>
+      <button type="submit" class="action primary">저장</button>
     </div>
   `;
-}
-
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('file-read-error'));
-    reader.readAsDataURL(file);
-  });
-}
-
-function initGameFormPreview(form, game = {}) {
-  const title = form.elements.title;
-  const originalPlatform = form.elements.originalPlatform;
-  const releaseDate = form.elements.releaseDate;
-  const urlInput = form.elements.coverImageUrl;
-  const fileInput = form.elements.coverImageFile;
-  const removeInput = form.elements.removeCoverImage;
-  const previewArea = form.querySelector('#coverPreviewArea');
-  let uploadedImageData = '';
-
-  const renderPreview = () => {
-    const remove = removeInput.checked;
-    const image = remove ? '' : (uploadedImageData || String(urlInput.value || '').trim() || game.coverImage || '');
-    previewArea.innerHTML = coverPreviewMarkup({
-      title: title.value || '커버 미리보기',
-      originalPlatform: originalPlatform.value || '기타',
-      releaseDate: releaseDate.value || '',
-      coverImage: image
-    });
-  };
-
-  [title, originalPlatform, releaseDate, urlInput, removeInput].forEach(el => {
-    el.addEventListener('input', renderPreview);
-    el.addEventListener('change', renderPreview);
-  });
-
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) {
-      uploadedImageData = '';
-      renderPreview();
-      return;
-    }
-    uploadedImageData = await readFileAsDataURL(file);
-    removeInput.checked = false;
-    renderPreview();
-  });
-
-  form._getResolvedCoverImage = async () => {
-    if (removeInput.checked) return '';
-    const file = fileInput.files?.[0];
-    if (file) return readFileAsDataURL(file);
-    return String(urlInput.value || '').trim();
-  };
-
-  renderPreview();
-}
-
-function initAchievementFormPreview(form, achievement = {}) {
-  const title = form.elements.title;
-  const difficulty = form.elements.difficulty;
-  const urlInput = form.elements.achievementImageUrl;
-  const fileInput = form.elements.achievementImageFile;
-  const removeInput = form.elements.removeAchievementImage;
-  const previewArea = form.querySelector('#achievementPreviewArea');
-  let uploadedImageData = '';
-
-  const renderPreview = () => {
-    const remove = removeInput.checked;
-    const image = remove ? '' : (uploadedImageData || String(urlInput.value || '').trim() || achievement.image || '');
-    previewArea.innerHTML = achievementPreviewMarkup({
-      title: title.value || '업적 미리보기',
-      difficulty: difficulty.value || '보통',
-      image
-    });
-  };
-
-  [title, difficulty, urlInput, removeInput].forEach(el => {
-    el.addEventListener('input', renderPreview);
-    el.addEventListener('change', renderPreview);
-  });
-
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) {
-      uploadedImageData = '';
-      renderPreview();
-      return;
-    }
-    uploadedImageData = await readFileAsDataURL(file);
-    removeInput.checked = false;
-    renderPreview();
-  });
-
-  form._getResolvedAchievementImage = async () => {
-    if (removeInput.checked) return '';
-    const file = fileInput.files?.[0];
-    if (file) return readFileAsDataURL(file);
-    return String(urlInput.value || '').trim();
-  };
-
-  renderPreview();
 }
 
 function openAddGameModal() {
   openModal({
     title: '게임 추가',
-    html: gameFormHtml(),
-    onOpen: form => initGameFormPreview(form),
-    onSubmit: async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.target);
+    html: gameFormHtml({
+      originalPlatform: ORIGINAL_PLATFORMS[0],
+      playedPlatform: PLAYED_PLATFORMS[0],
+      status: '예정',
+      genre: '액션'
+    }),
+    onSubmit: (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
       const now = new Date().toISOString();
-      const newGame = {
+
+      state.games.unshift({
         id: uid(),
-        title: String(fd.get('title')).trim(),
-        altTitle: String(fd.get('altTitle')).trim(),
-        originalPlatform: String(fd.get('originalPlatform')),
-        playedPlatform: String(fd.get('playedPlatform')),
-        releaseDate: String(fd.get('releaseDate')),
-        genre: String(fd.get('genre')),
-        status: String(fd.get('status')),
-        coverImage: await event.target._getResolvedCoverImage(),
-        note: String(fd.get('note')).trim(),
+        title: fd.get('title').trim(),
+        altTitle: fd.get('altTitle').trim(),
+        originalPlatform: fd.get('originalPlatform'),
+        playedPlatform: fd.get('playedPlatform'),
+        releaseDate: fd.get('releaseDate'),
+        genre: fd.get('genre'),
+        status: fd.get('status'),
+        coverImage: fd.get('coverImage').trim(),
+        note: fd.get('note').trim(),
         createdAt: now,
         updatedAt: now,
         achievements: []
-      };
-      state.games.unshift(newGame);
-      selectedGameId = newGame.id;
+      });
+
       closeModal();
+      setPage('games');
       render();
-      setPage('detail');
     }
   });
 }
 
 function openEditGameModal(gameId) {
-  const game = state.games.find(item => item.id === gameId);
+  const game = state.games.find(g => g.id === gameId);
   if (!game) return;
+
   openModal({
     title: '게임 수정',
     html: gameFormHtml(game),
-    onOpen: form => initGameFormPreview(form, game),
-    onSubmit: async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.target);
-      game.title = String(fd.get('title')).trim();
-      game.altTitle = String(fd.get('altTitle')).trim();
-      game.originalPlatform = String(fd.get('originalPlatform'));
-      game.playedPlatform = String(fd.get('playedPlatform'));
-      game.releaseDate = String(fd.get('releaseDate'));
-      game.genre = String(fd.get('genre'));
-      game.status = String(fd.get('status'));
-      game.coverImage = await event.target._getResolvedCoverImage();
-      game.note = String(fd.get('note')).trim();
+    onSubmit: (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      game.title = fd.get('title').trim();
+      game.altTitle = fd.get('altTitle').trim();
+      game.originalPlatform = fd.get('originalPlatform');
+      game.playedPlatform = fd.get('playedPlatform');
+      game.releaseDate = fd.get('releaseDate');
+      game.genre = fd.get('genre');
+      game.status = fd.get('status');
+      game.coverImage = fd.get('coverImage').trim();
+      game.note = fd.get('note').trim();
       game.updatedAt = new Date().toISOString();
       closeModal();
       render();
@@ -955,55 +722,51 @@ function openEditGameModal(gameId) {
 }
 
 function openAddAchievementModal(gameId) {
-  const game = state.games.find(item => item.id === gameId);
-  if (!game) return;
   openModal({
     title: '업적 추가',
-    html: achievementFormHtml(game),
-    onOpen: form => initAchievementFormPreview(form),
-    onSubmit: async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.target);
+    html: achievementFormHtml(gameId),
+    onSubmit: (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const game = state.games.find(g => g.id === gameId);
+      if (!game) return;
+
       game.achievements.push({
         id: uid(),
-        title: String(fd.get('title')).trim(),
-        description: String(fd.get('description')).trim(),
-        difficulty: String(fd.get('difficulty')),
-        image: await event.target._getResolvedAchievementImage(),
+        title: fd.get('title').trim(),
+        description: fd.get('description').trim(),
+        difficulty: fd.get('difficulty'),
         completed: false,
         completedAt: '',
-        note: String(fd.get('note')).trim(),
+        note: fd.get('note').trim(),
         order: Number(fd.get('order')) || game.achievements.length + 1,
         updatedAt: new Date().toISOString()
       });
-      normalizeAchievementOrder(game);
+
       game.updatedAt = new Date().toISOString();
       closeModal();
       render();
-      setPage('detail');
     }
   });
 }
 
 function editAchievement(gameId, achievementId) {
-  const game = state.games.find(item => item.id === gameId);
-  const achievement = game?.achievements.find(item => item.id === achievementId);
-  if (!game || !achievement) return;
+  const game = state.games.find(g => g.id === gameId);
+  const ach = game?.achievements.find(a => a.id === achievementId);
+  if (!game || !ach) return;
+
   openModal({
     title: '업적 수정',
-    html: achievementFormHtml(game, achievement),
-    onOpen: form => initAchievementFormPreview(form, achievement),
-    onSubmit: async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.target);
-      achievement.title = String(fd.get('title')).trim();
-      achievement.description = String(fd.get('description')).trim();
-      achievement.difficulty = String(fd.get('difficulty'));
-      achievement.image = await event.target._getResolvedAchievementImage();
-      achievement.note = String(fd.get('note')).trim();
-      achievement.order = Number(fd.get('order')) || achievement.order;
-      achievement.updatedAt = new Date().toISOString();
-      normalizeAchievementOrder(game);
+    html: achievementFormHtml(gameId, ach),
+    onSubmit: (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      ach.title = fd.get('title').trim();
+      ach.description = fd.get('description').trim();
+      ach.difficulty = fd.get('difficulty');
+      ach.note = fd.get('note').trim();
+      ach.order = Number(fd.get('order')) || ach.order;
+      ach.updatedAt = new Date().toISOString();
       game.updatedAt = new Date().toISOString();
       closeModal();
       render();
@@ -1011,64 +774,34 @@ function editAchievement(gameId, achievementId) {
   });
 }
 
-function normalizeAchievementOrder(game) {
-  game.achievements.sort((a, b) => a.order - b.order).forEach((achievement, index) => {
-    achievement.order = index + 1;
-  });
-}
-
-function moveAchievement(gameId, achievementId, direction) {
-  const game = state.games.find(item => item.id === gameId);
-  if (!game) return;
-  const list = [...game.achievements].sort((a, b) => a.order - b.order);
-  const index = list.findIndex(item => item.id === achievementId);
-  const targetIndex = index + direction;
-  if (index < 0 || targetIndex < 0 || targetIndex >= list.length) return;
-  [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
-  list.forEach((item, idx) => { item.order = idx + 1; });
-  game.achievements = list;
-  game.updatedAt = new Date().toISOString();
-  render();
-}
-
 function deleteAchievement(gameId, achievementId) {
-  const game = state.games.find(item => item.id === gameId);
+  const game = state.games.find(g => g.id === gameId);
   if (!game) return;
   if (!confirm('이 업적을 삭제할까?')) return;
-  game.achievements = game.achievements.filter(item => item.id !== achievementId);
-  normalizeAchievementOrder(game);
+  game.achievements = game.achievements.filter(a => a.id !== achievementId);
   game.updatedAt = new Date().toISOString();
-  render();
-}
-
-function deleteGame(gameId) {
-  const game = state.games.find(item => item.id === gameId);
-  if (!game) return;
-  if (!confirm(`'${game.title}' 게임을 삭제할까?`)) return;
-  state.games = state.games.filter(item => item.id !== gameId);
-  selectedGameId = state.games[0]?.id || null;
-  setPage('games');
   render();
 }
 
 function toggleAchievement(gameId, achievementId) {
-  const game = state.games.find(item => item.id === gameId);
-  const achievement = game?.achievements.find(item => item.id === achievementId);
-  if (!game || !achievement) return;
-  achievement.completed = !achievement.completed;
-  achievement.completedAt = achievement.completed ? new Date().toISOString().slice(0, 10) : '';
-  achievement.updatedAt = new Date().toISOString();
+  const game = state.games.find(g => g.id === gameId);
+  const ach = game?.achievements.find(a => a.id === achievementId);
+  if (!game || !ach) return;
+
+  ach.completed = !ach.completed;
+  ach.completedAt = ach.completed ? new Date().toISOString().slice(0, 10) : '';
+  ach.updatedAt = new Date().toISOString();
   game.updatedAt = new Date().toISOString();
   render();
   setPage('detail');
 }
 
 function saveAchievementNote(gameId, achievementId, value) {
-  const game = state.games.find(item => item.id === gameId);
-  const achievement = game?.achievements.find(item => item.id === achievementId);
-  if (!game || !achievement) return;
-  achievement.note = value;
-  achievement.updatedAt = new Date().toISOString();
+  const game = state.games.find(g => g.id === gameId);
+  const ach = game?.achievements.find(a => a.id === achievementId);
+  if (!game || !ach) return;
+  ach.note = value;
+  ach.updatedAt = new Date().toISOString();
   game.updatedAt = new Date().toISOString();
   saveState();
 }
@@ -1116,23 +849,21 @@ function setSort(sort) {
 }
 
 function exportJson() {
-  state.meta.lastBackupAt = new Date().toISOString();
-  saveState();
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `retro-challenge-log-${new Date().toISOString().slice(0, 10)}.json`;
-  anchor.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'retro-challenge-log-backup.json';
+  a.click();
   URL.revokeObjectURL(url);
-  renderSettings();
 }
 
 function importJson(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const imported = normalizeState(JSON.parse(String(reader.result || '{}')));
+      const imported = JSON.parse(reader.result);
+      if (!imported.games || !imported.ui) throw new Error('invalid');
       state = imported;
       selectedGameId = state.games[0]?.id || null;
       render();
@@ -1146,49 +877,49 @@ function importJson(file) {
 
 function resetAllData() {
   if (!confirm('정말 전체 데이터를 초기화할까?')) return;
-  state = normalizeState(seedData());
+  state = seedData();
   selectedGameId = state.games[0]?.id || null;
   currentPage = 'home';
+  saveState();
   render();
 }
 
-function bindEvents() {
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => setPage(btn.dataset.page));
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setPage(btn.dataset.page);
   });
-  document.getElementById('quickAddBtn').addEventListener('click', openAddGameModal);
-  document.getElementById('backupTopBtn').addEventListener('click', exportJson);
-  document.getElementById('fabBtn').addEventListener('click', () => {
-    if (currentPage === 'detail' && selectedGameId) openAddAchievementModal(selectedGameId);
-    else openAddGameModal();
-  });
-  document.getElementById('viewBtn').addEventListener('click', () => openDrawer('view'));
-  document.getElementById('filterBtn').addEventListener('click', () => openDrawer('filter'));
-  document.getElementById('sortBtn').addEventListener('click', () => openDrawer('sort'));
-  document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
-  document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
-  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
-  document.getElementById('modalBackdrop').addEventListener('click', closeModal);
-  document.getElementById('gameSearchInput').addEventListener('input', event => {
-    state.ui.search = event.target.value;
-    renderGames();
-    renderAppliedChips();
-    saveState();
-  });
-  document.getElementById('backToGamesBtn').addEventListener('click', () => setPage('games'));
-  document.getElementById('editGameBtn').addEventListener('click', () => selectedGameId && openEditGameModal(selectedGameId));
-  document.getElementById('deleteGameBtn').addEventListener('click', () => selectedGameId && deleteGame(selectedGameId));
-  document.getElementById('addAchievementBtn').addEventListener('click', () => selectedGameId && openAddAchievementModal(selectedGameId));
-  document.getElementById('exportBtn').addEventListener('click', exportJson);
-  document.getElementById('importInput').addEventListener('change', event => {
-    const file = event.target.files?.[0];
-    if (file) importJson(file);
-    event.target.value = '';
-  });
-  document.getElementById('resetBtn').addEventListener('click', resetAllData);
-}
+});
 
-bindEvents();
+document.getElementById('quickAddBtn').addEventListener('click', openAddGameModal);
+document.getElementById('fabBtn').addEventListener('click', () => {
+  if (currentPage === 'detail' && selectedGameId) openAddAchievementModal(selectedGameId);
+  else openAddGameModal();
+});
+document.getElementById('viewBtn').addEventListener('click', () => openDrawer('view'));
+document.getElementById('filterBtn').addEventListener('click', () => openDrawer('filter'));
+document.getElementById('sortBtn').addEventListener('click', () => openDrawer('sort'));
+document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
+document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
+document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+document.getElementById('modalBackdrop').addEventListener('click', closeModal);
+document.getElementById('gameSearchInput').addEventListener('input', (e) => {
+  state.ui.search = e.target.value;
+  renderGames();
+  renderAppliedChips();
+  saveState();
+});
+document.getElementById('editGameBtn').addEventListener('click', () => selectedGameId && openEditGameModal(selectedGameId));
+document.getElementById('addAchievementBtn').addEventListener('click', () => selectedGameId && openAddAchievementModal(selectedGameId));
+window.setPage = setPage;
+document.getElementById('exportBtn').addEventListener('click', exportJson);
+document.getElementById('importInput').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (file) importJson(file);
+  e.target.value = '';
+});
+document.getElementById('resetBtn').addEventListener('click', resetAllData);
+
+selectedGameId = state.games[0]?.id || null;
 render();
 
 window.openGame = openGame;
@@ -1198,10 +929,8 @@ window.toggleAchievementOpen = toggleAchievementOpen;
 window.saveAchievementNote = saveAchievementNote;
 window.editAchievement = editAchievement;
 window.deleteAchievement = deleteAchievement;
-window.moveAchievement = moveAchievement;
 window.setGamesViewMode = setGamesViewMode;
 window.applyFiltersFromDrawer = applyFiltersFromDrawer;
 window.resetFilters = resetFilters;
 window.setSort = setSort;
 window.closeModal = closeModal;
-window.deleteGame = deleteGame;
