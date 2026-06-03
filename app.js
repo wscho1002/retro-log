@@ -530,11 +530,11 @@ function renderAchievementCard(gameId, gameTitle, achievement) {
       <div class="achievement-main">
         <button class="check-btn ${achievement.completed ? 'done' : ''}" onclick="toggleAchievement('${gameId}','${achievement.id}'); event.stopPropagation();">✓</button>
         <div class="achievement-art">${achievementImageMarkup(achievement, gameTitle)}</div>
-<button class="achievement-text-button" onclick="toggleAchievementOpen('${achievement.id}')">
-  <h4 class="achievement-title">${escapeHtml(achievement.title)}</h4>
-  ${achievement.description ? `<div class="muted small" style="margin-top:4px; line-height:1.4;">${escapeHtml(achievement.description)}</div>` : ''}
-  <div class="muted small" style="margin-top:4px;">${achievement.completed ? `${formatDate(achievement.completedAt)} 달성` : '탭해서 세부 정보 보기'}</div>
-</button>
+        <button class="achievement-text-button" onclick="toggleAchievementOpen('${achievement.id}')">
+          <h4 class="achievement-title">${escapeHtml(achievement.title)}</h4>
+          ${achievement.description ? `<div class="muted small" style="margin-top:4px; line-height:1.4;">${escapeHtml(achievement.description)}</div>` : ''}
+          <div class="muted small" style="margin-top:4px;">${achievement.completed ? `${formatDate(achievement.completedAt)} 달성` : '탭해서 세부 정보 보기'}</div>
+        </button>
         <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
       </div>
       <div class="achievement-extra">
@@ -793,6 +793,59 @@ function achievementFormHtml(game, achievement = {}) {
   `;
 }
 
+function bulkAchievementFormHtml(game) {
+  return `
+    <div class="form-grid">
+      <div class="item-box">
+        <strong>${escapeHtml(game.title)}</strong>
+        <div class="muted small">아래 JSON을 붙여넣으면 업적을 한 번에 추가한다.</div>
+      </div>
+      <div class="field">
+        <label>붙여넣기 JSON</label>
+        <textarea class="textarea" name="bulkJson" style="min-height:260px;" placeholder='{
+  "achievements": [
+    {
+      "title": "첫 던전 돌입",
+      "description": "처음으로 던전에 들어간다.",
+      "difficulty": "쉬움",
+      "image": ""
+    }
+  ]
+}'></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" onclick="closeModal()">취소</button>
+      <button type="submit" class="btn primary">가져오기</button>
+    </div>
+  `;
+}
+
+function parseAchievementBundle(rawText) {
+  const parsed = JSON.parse(rawText);
+
+  if (!parsed || !Array.isArray(parsed.achievements)) {
+    throw new Error('achievements 배열이 필요하다.');
+  }
+
+  return parsed.achievements.map((item, index) => {
+    const title = String(item.title || '').trim();
+    const description = String(item.description || '').trim();
+    const difficulty = String(item.difficulty || '보통').trim();
+    const image = String(item.image || '').trim();
+
+    if (!title) {
+      throw new Error(`${index + 1}번째 업적 제목이 비어 있다.`);
+    }
+
+    if (!DIFFICULTIES.includes(difficulty)) {
+      throw new Error(`${title}: 난이도는 쉬움/보통/어려움/극악 중 하나여야 한다.`);
+    }
+
+    return { title, description, difficulty, image };
+  });
+}
+
 function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -982,6 +1035,65 @@ function openAddAchievementModal(gameId) {
       closeModal();
       render();
       setPage('detail');
+    }
+  });
+}
+
+function openBulkAchievementModal(gameId) {
+  const game = state.games.find(item => item.id === gameId);
+  if (!game) return;
+
+  openModal({
+    title: '업적 일괄 추가',
+    html: bulkAchievementFormHtml(game),
+    onSubmit: (event) => {
+      event.preventDefault();
+
+      const rawText = String(new FormData(event.target).get('bulkJson') || '').trim();
+      if (!rawText) {
+        alert('JSON을 붙여넣어야 한다.');
+        return;
+      }
+
+      try {
+        const items = parseAchievementBundle(rawText);
+        const existingTitles = new Set(game.achievements.map(a => a.title.trim()));
+        let addedCount = 0;
+        let skippedCount = 0;
+
+        items.forEach(item => {
+          if (existingTitles.has(item.title)) {
+            skippedCount += 1;
+            return;
+          }
+
+          game.achievements.push({
+            id: uid(),
+            title: item.title,
+            description: item.description,
+            difficulty: item.difficulty,
+            image: item.image,
+            completed: false,
+            completedAt: '',
+            note: '',
+            order: game.achievements.length + 1,
+            updatedAt: new Date().toISOString()
+          });
+
+          existingTitles.add(item.title);
+          addedCount += 1;
+        });
+
+        normalizeAchievementOrder(game);
+        game.updatedAt = new Date().toISOString();
+
+        closeModal();
+        render();
+        setPage('detail');
+        alert(`업적 ${addedCount}개 추가됨 / ${skippedCount}개 중복으로 건너뜀`);
+      } catch (error) {
+        alert(`가져오기 실패: ${error.message}`);
+      }
     }
   });
 }
@@ -1179,6 +1291,10 @@ function bindEvents() {
   document.getElementById('backToGamesBtn').addEventListener('click', () => setPage('games'));
   document.getElementById('editGameBtn').addEventListener('click', () => selectedGameId && openEditGameModal(selectedGameId));
   document.getElementById('deleteGameBtn').addEventListener('click', () => selectedGameId && deleteGame(selectedGameId));
+  const bulkBtn = document.getElementById('bulkAddAchievementBtn');
+  if (bulkBtn) {
+    bulkBtn.addEventListener('click', () => selectedGameId && openBulkAchievementModal(selectedGameId));
+  }
   document.getElementById('addAchievementBtn').addEventListener('click', () => selectedGameId && openAddAchievementModal(selectedGameId));
   document.getElementById('exportBtn').addEventListener('click', exportJson);
   document.getElementById('importInput').addEventListener('change', event => {
