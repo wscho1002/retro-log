@@ -188,6 +188,8 @@ img { display: block; max-width: 100%; }
 .badge.diff-보통 { color: #8dffb7; }
 .badge.diff-어려움 { color: #ffd166; }
 .badge.diff-극악 { color: #ff8c8c; }
+.badge.hidden-badge { color: #d9b8ff; border-color: rgba(217,184,255,.28); }
+#hiddenAchievementsPanel { display: grid; }
 
 .game-grid,
 .platform-body,
