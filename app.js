@@ -47,9 +47,9 @@ function seedData() {
         createdAt: now,
         updatedAt: now,
         achievements: [
-          { id: uid(), title: '1회 클리어', description: '엔딩 보기', difficulty: '쉬움', image: '', completed: true, completedAt: '2026-03-18', note: '초반 워프 사용', order: 1, updatedAt: now },
-          { id: uid(), title: '워프 없이 클리어', description: '전 구간 정석 진행', difficulty: '보통', image: '', completed: false, completedAt: '', note: '', order: 2, updatedAt: now },
-          { id: uid(), title: '노컨티뉴 클리어', description: '컨티뉴 없이 엔딩', difficulty: '어려움', image: '', completed: false, completedAt: '', note: '', order: 3, updatedAt: now }
+          { id: uid(), title: '1회 클리어', description: '엔딩 보기', difficulty: '쉬움', image: '', isHidden: false, completed: true, completedAt: '2026-03-18', note: '초반 워프 사용', order: 1, updatedAt: now },
+          { id: uid(), title: '워프 없이 클리어', description: '전 구간 정석 진행', difficulty: '보통', image: '', isHidden: false, completed: false, completedAt: '', note: '', order: 2, updatedAt: now },
+          { id: uid(), title: '노컨티뉴 클리어', description: '컨티뉴 없이 엔딩', difficulty: '어려움', image: '', isHidden: false, completed: false, completedAt: '', note: '', order: 3, updatedAt: now }
         ]
       },
       {
@@ -66,8 +66,8 @@ function seedData() {
         createdAt: now,
         updatedAt: now,
         achievements: [
-          { id: uid(), title: '1회 엔딩 보기', description: '아무 루트나 엔딩 보기', difficulty: '쉬움', image: '', completed: false, completedAt: '', note: '', order: 1, updatedAt: now },
-          { id: uid(), title: '세이브 최소화', description: '세이브를 아껴서 클리어', difficulty: '어려움', image: '', completed: false, completedAt: '', note: '', order: 2, updatedAt: now }
+          { id: uid(), title: '1회 엔딩 보기', description: '아무 루트나 엔딩 보기', difficulty: '쉬움', image: '', isHidden: false, completed: false, completedAt: '', note: '', order: 1, updatedAt: now },
+          { id: uid(), title: '세이브 최소화', description: '세이브를 아껴서 클리어', difficulty: '어려움', image: '', isHidden: false, completed: false, completedAt: '', note: '', order: 2, updatedAt: now }
         ]
       }
     ],
@@ -121,6 +121,7 @@ function normalizeState(input) {
       description: ach.description || '',
       difficulty: ach.difficulty || '보통',
       image: ach.image || '',
+      isHidden: !!ach.isHidden,
       completed: !!ach.completed,
       completedAt: ach.completedAt || '',
       note: ach.note || '',
@@ -171,15 +172,16 @@ function yearOf(dateString = '') {
 }
 
 function gameProgress(game) {
-  const total = game.achievements.length;
-  const completed = game.achievements.filter(a => a.completed).length;
+  const visibleAchievements = game.achievements.filter(a => !a.isHidden);
+  const total = visibleAchievements.length;
+  const completed = visibleAchievements.filter(a => a.completed).length;
   return { total, completed, percent: total ? Math.round((completed / total) * 100) : 0 };
 }
 
 function overallStats() {
   const totalGames = state.games.length;
-  const totalAchievements = state.games.reduce((sum, game) => sum + game.achievements.length, 0);
-  const completedAchievements = state.games.reduce((sum, game) => sum + game.achievements.filter(a => a.completed).length, 0);
+  const totalAchievements = state.games.reduce((sum, game) => sum + game.achievements.filter(a => !a.isHidden).length, 0);
+  const completedAchievements = state.games.reduce((sum, game) => sum + game.achievements.filter(a => !a.isHidden && a.completed).length, 0);
   const clearedGames = state.games.filter(g => ['클리어', '올클 완료'].includes(g.status)).length;
   const playingGames = state.games.filter(g => g.status === '플레이 중').length;
   return {
@@ -493,6 +495,8 @@ function renderDetail() {
   if (!game) {
     document.getElementById('detailTitle').textContent = '게임을 선택해줘';
     document.getElementById('achievementList').innerHTML = `<div class="empty">게임이 없다.</div>`;
+    document.getElementById('hiddenAchievementList').innerHTML = `<div class="empty">게임이 없다.</div>`;
+    document.getElementById('hiddenAchievementCount').textContent = '0개';
     return;
   }
   const prog = gameProgress(game);
@@ -514,14 +518,26 @@ function renderDetail() {
     <button class="seg-btn ${currentAchievementFilter === filter.key ? 'active' : ''}" onclick="setAchievementFilter('${filter.key}')">${filter.label}</button>
   `).join('');
 
-  let achievements = [...game.achievements].sort((a, b) => a.order - b.order);
-  if (currentAchievementFilter === 'pending') achievements = achievements.filter(a => !a.completed);
-  if (currentAchievementFilter === 'done') achievements = achievements.filter(a => a.completed);
-  if (currentAchievementFilter === 'hard') achievements = achievements.filter(a => ['어려움', '극악'].includes(a.difficulty));
+  let visibleAchievements = [...game.achievements].filter(a => !a.isHidden).sort((a, b) => a.order - b.order);
+  if (currentAchievementFilter === 'pending') visibleAchievements = visibleAchievements.filter(a => !a.completed);
+  if (currentAchievementFilter === 'done') visibleAchievements = visibleAchievements.filter(a => a.completed);
+  if (currentAchievementFilter === 'hard') visibleAchievements = visibleAchievements.filter(a => ['어려움', '극악'].includes(a.difficulty));
 
-  document.getElementById('achievementList').innerHTML = achievements.length
-    ? achievements.map(achievement => renderAchievementCard(game.id, game.title, achievement)).join('')
+  const hiddenAchievements = [...game.achievements].filter(a => a.isHidden).sort((a, b) => a.order - b.order);
+
+  document.getElementById('achievementList').innerHTML = visibleAchievements.length
+    ? visibleAchievements.map(achievement => renderAchievementCard(game.id, game.title, achievement)).join('')
     : `<div class="empty">조건에 맞는 업적이 없다.</div>`;
+
+  document.getElementById('hiddenAchievementCount').textContent = `${hiddenAchievements.length}개`;
+  const hiddenPanel = document.getElementById('hiddenAchievementsPanel');
+  if (hiddenAchievements.length) {
+    hiddenPanel.style.display = 'grid';
+    document.getElementById('hiddenAchievementList').innerHTML = hiddenAchievements.map(achievement => renderAchievementCard(game.id, game.title, achievement)).join('');
+  } else {
+    hiddenPanel.style.display = 'none';
+    document.getElementById('hiddenAchievementList').innerHTML = '';
+  }
 }
 
 function renderAchievementCard(gameId, gameTitle, achievement) {
@@ -535,7 +551,10 @@ function renderAchievementCard(gameId, gameTitle, achievement) {
           ${achievement.description ? `<div class="muted small" style="margin-top:4px; line-height:1.4;">${escapeHtml(achievement.description)}</div>` : ''}
           <div class="muted small" style="margin-top:4px;">${achievement.completed ? `${formatDate(achievement.completedAt)} 달성` : '탭해서 세부 정보 보기'}</div>
         </button>
-        <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
+        <div class="meta-row">
+          <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
+          ${achievement.isHidden ? `<span class="badge hidden-badge">히든</span>` : ''}
+        </div>
       </div>
       <div class="achievement-extra">
         <div>${achievement.description ? escapeHtml(achievement.description) : '<span class="muted">설명이 없다.</span>'}</div>
@@ -545,6 +564,7 @@ function renderAchievementCard(gameId, gameTitle, achievement) {
             <div class="meta-row">
               ${achievement.completed ? `<span class="badge">달성 ${formatDate(achievement.completedAt)}</span>` : `<span class="badge">미달성</span>`}
               <span class="badge ${diffClass(achievement.difficulty)}">${escapeHtml(achievement.difficulty)}</span>
+              ${achievement.isHidden ? `<span class="badge hidden-badge">히든</span>` : ''}
             </div>
             <div class="field">
               <label>메모</label>
@@ -782,6 +802,9 @@ function achievementFormHtml(game, achievement = {}) {
         <div class="achievement-art-preview" id="achievementPreviewArea">${achievementPreviewMarkup(achievement)}</div>
       </div>
       <div class="field">
+        <label class="field-help"><input type="checkbox" name="isHidden" ${achievement.isHidden ? 'checked' : ''}> 히든 업적으로 추가 (진행률/100% 계산에서 제외)</label>
+      </div>
+      <div class="field">
         <label>메모</label>
         <textarea class="textarea" name="note">${escapeHtml(achievement.note || '')}</textarea>
       </div>
@@ -793,12 +816,13 @@ function achievementFormHtml(game, achievement = {}) {
   `;
 }
 
+
 function bulkAchievementFormHtml(game) {
   return `
     <div class="form-grid">
       <div class="item-box">
         <strong>${escapeHtml(game.title)}</strong>
-        <div class="muted small">아래 JSON을 붙여넣으면 업적을 한 번에 추가한다.</div>
+        <div class="muted small">아래 JSON을 붙여넣으면 업적을 한 번에 추가한다. 히든 업적은 isHidden: true 로 넣으면 된다.</div>
       </div>
       <div class="field">
         <label>붙여넣기 JSON</label>
@@ -808,7 +832,15 @@ function bulkAchievementFormHtml(game) {
       "title": "첫 던전 돌입",
       "description": "처음으로 던전에 들어간다.",
       "difficulty": "쉬움",
-      "image": ""
+      "image": "",
+      "isHidden": false
+    },
+    {
+      "title": "보너스 목표",
+      "description": "나중에라도 해볼 요소",
+      "difficulty": "어려움",
+      "image": "",
+      "isHidden": true
     }
   ]
 }'></textarea>
@@ -833,6 +865,7 @@ function parseAchievementBundle(rawText) {
     const description = String(item.description || '').trim();
     const difficulty = String(item.difficulty || '보통').trim();
     const image = String(item.image || '').trim();
+    const isHidden = !!item.isHidden;
 
     if (!title) {
       throw new Error(`${index + 1}번째 업적 제목이 비어 있다.`);
@@ -842,7 +875,7 @@ function parseAchievementBundle(rawText) {
       throw new Error(`${title}: 난이도는 쉬움/보통/어려움/극악 중 하나여야 한다.`);
     }
 
-    return { title, description, difficulty, image };
+    return { title, description, difficulty, image, isHidden };
   });
 }
 
@@ -1024,6 +1057,7 @@ function openAddAchievementModal(gameId) {
         description: String(fd.get('description')).trim(),
         difficulty: String(fd.get('difficulty')),
         image: await event.target._getResolvedAchievementImage(),
+        isHidden: fd.get('isHidden') === 'on',
         completed: false,
         completedAt: '',
         note: String(fd.get('note')).trim(),
@@ -1038,6 +1072,7 @@ function openAddAchievementModal(gameId) {
     }
   });
 }
+
 
 function openBulkAchievementModal(gameId) {
   const game = state.games.find(item => item.id === gameId);
@@ -1073,6 +1108,7 @@ function openBulkAchievementModal(gameId) {
             description: item.description,
             difficulty: item.difficulty,
             image: item.image,
+            isHidden: item.isHidden,
             completed: false,
             completedAt: '',
             note: '',
@@ -1113,6 +1149,7 @@ function editAchievement(gameId, achievementId) {
       achievement.description = String(fd.get('description')).trim();
       achievement.difficulty = String(fd.get('difficulty'));
       achievement.image = await event.target._getResolvedAchievementImage();
+      achievement.isHidden = fd.get('isHidden') === 'on';
       achievement.note = String(fd.get('note')).trim();
       achievement.order = Number(fd.get('order')) || achievement.order;
       achievement.updatedAt = new Date().toISOString();
